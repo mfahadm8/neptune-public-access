@@ -21,7 +21,7 @@ Ensure you have the following prerequisites installed:
 To create resources for your Neptune cluster, run the following command:
 
 ```bash
-bash create.sh <neptune cluster name>
+bash create.sh <neptune-cluster-name> [<domain-name>] [<neptune-sub-domain>]
 ```
 
 Replace `<neptune cluster name>` with your Neptune cluster identifier. For example:
