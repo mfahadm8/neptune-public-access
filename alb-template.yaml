@@ -17,6 +17,9 @@ Parameters:
   HostedZoneId:
     Type: String
     Description: Hosted Zone ID for powerodd.com
+  NeptuneSubDomain:
+    Type: String
+    Description: Neptune Sub Domain for ALB
 
 Resources:
   ALBSecurityGroup:
@@ -72,7 +75,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Ref HostedZoneId
-      Name: neptune-db.powerodd.com
+      Name: !Ref NeptuneSubDomain
       Type: A
       AliasTarget:
         DNSName: !GetAtt ApplicationLoadBalancer.DNSName

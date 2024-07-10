@@ -15,12 +15,13 @@ if [ "$#" -ne 1 ]; then
 fi
 
 NEPTUNE_CLUSTER_NAME=$1
-DOMAIN_NAME="powerodd.com"
+DOMAIN_NAME=$2 | "powerodd.com"
+NEPTUNE_SUB_DOMAIN=$3 | "neptune-db.powerodd.com"
 
 # Step 1: Retrieve the VPC ID of the Neptune cluster
 NEPTUNE_CLUSTER_INFO=$(aws neptune describe-db-clusters --db-cluster-identifier $NEPTUNE_CLUSTER_NAME) || error_exit "Failed to retrieve Neptune cluster info"
-INSTANCE_ID=$(echo $NEPTUNE_CLUSTER_INFO | grep -oP '(?<="DBInstanceIdentifier": ")[^"]+' | head -n 1) || error_exit "Failed to extract DBInstanceIdentifier"
-VPC_ID=$(aws neptune describe-db-instances --db-instance-identifier $INSTANCE_ID | grep -oP '(?<="VpcId": ")[^"]+') || error_exit "Failed to retrieve VPC ID"
+INSTANCE_ID=$(echo $NEPTUNE_CLUSTER_INFO | perl -nle 'print $& if m{"DBInstanceIdentifier": "\K[^"]+}' | head -n 1) || error_exit "Failed to extract DBInstanceIdentifier"
+VPC_ID=$(aws neptune describe-db-instances --db-instance-identifier $INSTANCE_ID | perl -nle 'print $& if m{"VpcId": "\K[^"]+}') || error_exit "Failed to retrieve VPC ID"
 
 echo "Retrieved VPC ID: $VPC_ID"
 
@@ -33,10 +34,10 @@ fi
 echo "Retrieved Public Subnet IDs: ${SUBNET_IDS[@]}"
 
 # Step 3: Retrieve private IPs of the Neptune cluster
-INSTANCE_IDS=$(echo $NEPTUNE_CLUSTER_INFO | grep -oP '(?<="DBInstanceIdentifier": ")[^"]+') || error_exit "Failed to extract DBInstanceIdentifiers"
+INSTANCE_IDS=$(echo $NEPTUNE_CLUSTER_INFO | perl -nle 'print $& if m{"DBInstanceIdentifier": "\K[^"]+}') || error_exit "Failed to extract DBInstanceIdentifiers"
 PRIVATE_IPS=()
 for INSTANCE_ID in $INSTANCE_IDS; do
-    ENDPOINT=$(aws neptune describe-db-instances --db-instance-identifier $INSTANCE_ID | grep -oP '(?<="Address": ")[^"]+') || error_exit "Failed to retrieve private IP"
+    ENDPOINT=$(aws neptune describe-db-instances --db-instance-identifier $INSTANCE_ID | perl -nle 'print $& if m{"Address": "\K[^"]+}') || error_exit "Failed to retrieve private IP"
     echo "Retrieved endpoint $ENDPOINT"
     RESOLVED_IP=$(dig +short $ENDPOINT)
     PRIVATE_IPS+=($RESOLVED_IP)
@@ -62,17 +63,14 @@ fi
 
 echo "Retrieved Certificate ARN: $CERT_ARN"
 
-
 # Step 7: Create a new Application Load Balancer using CloudFormation template
 STACK_NAME="NeptuneALBStack"
-
 
 aws cloudformation deploy \
     --stack-name $STACK_NAME \
     --template-file alb-template.yaml \
-    --parameter-overrides SubnetIds="${SUBNET_IDS[0]},${SUBNET_IDS[1]}" VpcId="$VPC_ID" CertArn="$CERT_ARN" TargetIP="${PRIVATE_IPS[0]}" HostedZoneId="$HOSTED_ZONE_ID" \
+    --parameter-overrides SubnetIds="${SUBNET_IDS[0]},${SUBNET_IDS[1]}" VpcId="$VPC_ID" CertArn="$CERT_ARN" TargetIP="${PRIVATE_IPS[0]}" HostedZoneId="$HOSTED_ZONE_ID" NeptuneSubDomain="$NEPTUNE_SUB_DOMAIN"\
     --capabilities CAPABILITY_NAMED_IAM \
     --no-fail-on-empty-changeset || error_exit "Failed to deploy CloudFormation stack"
-
 
 echo "CloudFormation stack creation initiated for ALB"

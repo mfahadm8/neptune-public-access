@@ -12,3 +12,4 @@ def run_query(conn, query):
 conn = create_client("wss://neptune-db.powerodd.com:8182/gremlin")
 query = 'g.V().limit(1)'
 results = run_query(conn, query)
+print(results)
