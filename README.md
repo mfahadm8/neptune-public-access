@@ -27,7 +27,7 @@ bash create.sh <neptune cluster name>
 Replace `<neptune cluster name>` with your Neptune cluster identifier. For example:
 
 ```bash
-bash create.sh db-neptune-1
+bash create.sh db-neptune-1 powerodd.com neptune-db.powerodd.com
 ```
 
 # Test

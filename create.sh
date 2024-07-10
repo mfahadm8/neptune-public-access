@@ -10,13 +10,13 @@ function error_exit {
 }
 
 # Check if the required argument is provided
-if [ "$#" -ne 1 ]; then
-    error_exit "Usage: $0 <neptune-cluster-name>"
+if [ "$#" -lt 1 ] || [ "$#" -gt 3 ]; then
+    error_exit "Usage: $0 <neptune-cluster-name> [<domain-name>] [<neptune-sub-domain>]"
 fi
 
 NEPTUNE_CLUSTER_NAME=$1
-DOMAIN_NAME=$2 | "powerodd.com"
-NEPTUNE_SUB_DOMAIN=$3 | "neptune-db.powerodd.com"
+DOMAIN_NAME=${2:-"powerodd.com"}
+NEPTUNE_SUB_DOMAIN=${3:-"neptune-db.powerodd.com"}
 
 # Step 1: Retrieve the VPC ID of the Neptune cluster
 NEPTUNE_CLUSTER_INFO=$(aws neptune describe-db-clusters --db-cluster-identifier $NEPTUNE_CLUSTER_NAME) || error_exit "Failed to retrieve Neptune cluster info"
