@@ -1,257 +1,161 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: An AWS Serverless Application Model template describing your function.
+Description: An AWS CloudFormation template describing your function.
 
 Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - PolicyName: "LambdaPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "ec2:DescribeInstances"
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:AttachNetworkInterface"
+                  - "ec2:DescribeNetworkInterfaces"
+                  - "ec2:DeleteNetworkInterface"
+                  - "rds:*"
+                  - "neptune-db:*"
+                  - "kms:ListAliases"
+                  - "kms:ListKeyPolicies"
+                  - "kms:ListKeys"
+                  - "kms:ListRetirableGrants"
+                  - "logs:DescribeLogStreams"
+                  - "logs:GetLogEvents"
+                  - "sns:ListSubscriptions"
+                  - "sns:ListTopics"
+                  - "sns:Publish"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:ListStackResources"
+                  - "cloudwatch:ListMetrics"
+                  - "cloudwatch:GetMetricData"
+                  - "ec2:DescribeSecurityGroups"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeVpcs"
+                  - "iam:GetPolicy"
+                  - "iam:GetPolicyVersion"
+                  - "iam:GetRole"
+                  - "iam:GetRolePolicy"
+                  - "iam:ListAttachedRolePolicies"
+                  - "iam:ListRolePolicies"
+                  - "iam:ListRoles"
+                  - "lambda:*"
+                  - "logs:DescribeLogGroups"
+                  - "states:DescribeStateMachine"
+                  - "states:ListStateMachines"
+                  - "tag:GetResources"
+                  - "xray:GetTraceSummaries"
+                  - "xray:BatchGetTraces"
+                  - "iam:PassRole"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:FilterLogEvents"
+                  - "logs:CreateLogGroup"
+                Resource: "*"
+              - Effect: "Allow"
+                Action: 
+                  - "iam:PassRole"
+                Resource: "*"
+                Condition: 
+                  StringEquals: 
+                    iam:PassedToService: 
+                      - "lambda.amazonaws.com"
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                Resource: "arn:aws:logs:ap-southeast-2:337393854581:*"
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: 
+                  - "arn:aws:logs:ap-southeast-2:337393854581:log-group:*"
+  
   LambdaFunction:
-    Type: AWS::Serverless::Function
+    Type: AWS::Lambda::Function
     Properties:
-      CodeUri: .
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
       Description: ''
       MemorySize: 128
       Timeout: 30 
       FunctionName: !Ref FunctionName
       Handler: index.handler
       Runtime: nodejs20.x
-      Architectures:
-        - x86_64
-      EphemeralStorage:
-        Size: 512
+      Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
           NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
-      PackageType: Zip
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Resource: '*'
-              Action:
-                - ec2:DescribeInstances
-                - ec2:CreateNetworkInterface
-                - ec2:AttachNetworkInterface
-                - ec2:DescribeNetworkInterfaces
-                - autoscaling:CompleteLifecycleAction
-                - ec2:DeleteNetworkInterface
-            - Sid: AllowNeptuneCreate
-              Effect: Allow
-              Action:
-                - rds:CreateDBCluster
-                - rds:CreateDBInstance
-              Resource:
-                - arn:aws:rds:*:*:*
-              Condition:
-                StringEquals:
-                  rds:DatabaseEngine:
-                    - graphdb
-                    - neptune
-            - Sid: AllowManagementPermissionsForRDS
-              Effect: Allow
-              Action:
-                - rds:AddRoleToDBCluster
-                - rds:AddSourceIdentifierToSubscription
-                - rds:AddTagsToResource
-                - rds:ApplyPendingMaintenanceAction
-                - rds:CopyDBClusterParameterGroup
-                - rds:CopyDBClusterSnapshot
-                - rds:CopyDBParameterGroup
-                - rds:CreateDBClusterEndpoint
-                - rds:CreateDBClusterParameterGroup
-                - rds:CreateDBClusterSnapshot
-                - rds:CreateDBParameterGroup
-                - rds:CreateDBSubnetGroup
-                - rds:CreateEventSubscription
-                - rds:CreateGlobalCluster
-                - rds:DeleteDBCluster
-                - rds:DeleteDBClusterEndpoint
-                - rds:DeleteDBClusterParameterGroup
-                - rds:DeleteDBClusterSnapshot
-                - rds:DeleteDBInstance
-                - rds:DeleteDBParameterGroup
-                - rds:DeleteDBSubnetGroup
-                - rds:DeleteEventSubscription
-                - rds:DeleteGlobalCluster
-                - rds:DescribeDBClusterEndpoints
-                - rds:DescribeAccountAttributes
-                - rds:DescribeCertificates
-                - rds:DescribeDBClusterParameterGroups
-                - rds:DescribeDBClusterParameters
-                - rds:DescribeDBClusterSnapshotAttributes
-                - rds:DescribeDBClusterSnapshots
-                - rds:DescribeDBClusters
-                - rds:DescribeDBEngineVersions
-                - rds:DescribeDBInstances
-                - rds:DescribeDBLogFiles
-                - rds:DescribeDBParameterGroups
-                - rds:DescribeDBParameters
-                - rds:DescribeDBSecurityGroups
-                - rds:DescribeDBSubnetGroups
-                - rds:DescribeEngineDefaultClusterParameters
-                - rds:DescribeEngineDefaultParameters
-                - rds:DescribeEventCategories
-                - rds:DescribeEventSubscriptions
-                - rds:DescribeEvents
-                - rds:DescribeGlobalClusters
-                - rds:DescribeOptionGroups
-                - rds:DescribeOrderableDBInstanceOptions
-                - rds:DescribePendingMaintenanceActions
-                - rds:DescribeValidDBInstanceModifications
-                - rds:DownloadDBLogFilePortion
-                - rds:FailoverDBCluster
-                - rds:FailoverGlobalCluster
-                - rds:ListTagsForResource
-                - rds:ModifyDBCluster
-                - rds:ModifyDBClusterEndpoint
-                - rds:ModifyDBClusterParameterGroup
-                - rds:ModifyDBClusterSnapshotAttribute
-                - rds:ModifyDBInstance
-                - rds:ModifyDBParameterGroup
-                - rds:ModifyDBSubnetGroup
-                - rds:ModifyEventSubscription
-                - rds:ModifyGlobalCluster
-                - rds:PromoteReadReplicaDBCluster
-                - rds:RebootDBInstance
-                - rds:RemoveFromGlobalCluster
-                - rds:RemoveRoleFromDBCluster
-                - rds:RemoveSourceIdentifierFromSubscription
-                - rds:RemoveTagsFromResource
-                - rds:ResetDBClusterParameterGroup
-                - rds:ResetDBParameterGroup
-                - rds:RestoreDBClusterFromSnapshot
-                - rds:RestoreDBClusterToPointInTime
-                - rds:StartDBCluster
-                - rds:StopDBCluster
-              Resource:
-                - '*'
-            - Sid: AllowOtherDepedentPermissions
-              Effect: Allow
-              Action:
-                - cloudwatch:GetMetricStatistics
-                - cloudwatch:ListMetrics
-                - ec2:DescribeAccountAttributes
-                - ec2:DescribeAvailabilityZones
-                - ec2:DescribeSecurityGroups
-                - ec2:DescribeSubnets
-                - ec2:DescribeVpcAttribute
-                - ec2:DescribeVpcs
-                - kms:ListAliases
-                - kms:ListKeyPolicies
-                - kms:ListKeys
-                - kms:ListRetirableGrants
-                - logs:DescribeLogStreams
-                - logs:GetLogEvents
-                - sns:ListSubscriptions
-                - sns:ListTopics
-                - sns:Publish
-              Resource:
-                - '*'
-            - Sid: AllowPassRoleForNeptune
-              Effect: Allow
-              Action:
-                - iam:PassRole
-              Resource: '*'
-              Condition:
-                StringEquals:
-                  iam:passedToService: rds.amazonaws.com
-            - Sid: AllowCreateSLRForNeptune
-              Effect: Allow
-              Action:
-                - iam:CreateServiceLinkedRole
-              Resource: >-
-                arn:aws:iam::*:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS
-              Condition:
-                StringLike:
-                  iam:AWSServiceName: rds.amazonaws.com
-            - Sid: AllowDataAccessForNeptune
-              Effect: Allow
-              Action:
-                - neptune-db:*
-              Resource:
-                - '*'
-            - Effect: Allow
-              Action:
-                - cloudformation:DescribeStacks
-                - cloudformation:ListStackResources
-                - cloudwatch:ListMetrics
-                - cloudwatch:GetMetricData
-                - ec2:DescribeSecurityGroups
-                - ec2:DescribeSubnets
-                - ec2:DescribeVpcs
-                - kms:ListAliases
-                - iam:GetPolicy
-                - iam:GetPolicyVersion
-                - iam:GetRole
-                - iam:GetRolePolicy
-                - iam:ListAttachedRolePolicies
-                - iam:ListRolePolicies
-                - iam:ListRoles
-                - lambda:*
-                - logs:DescribeLogGroups
-                - states:DescribeStateMachine
-                - states:ListStateMachines
-                - tag:GetResources
-                - xray:GetTraceSummaries
-                - xray:BatchGetTraces
-              Resource: '*'
-            - Effect: Allow
-              Action:
-                - iam:PassRole
-              Resource: '*'
-              Condition:
-                StringEquals:
-                  iam:PassedToService: lambda.amazonaws.com
-            - Effect: Allow
-              Action:
-                - logs:DescribeLogStreams
-                - logs:GetLogEvents
-                - logs:FilterLogEvents
-              Resource: arn:aws:logs:*:*:log-group:/aws/lambda/*
-            - Effect: Allow
-              Action:
-                - logs:CreateLogGroup
-              Resource: arn:aws:logs:ap-southeast-2:337393854581:*
-            - Effect: Allow
-              Action:
-                - logs:CreateLogStream
-                - logs:PutLogEvents
-              Resource:
-                - >-
-                  arn:aws:logs:ap-southeast-2:337393854581:log-group:*
-      VpcConfig:
+      VpcConfig: 
         SecurityGroupIds: !If
           - AddVpc
-          - [!Ref LambdaSecurityGroup]
+          - [!Ref LambdaExecutionSecurityGroup]
           - !Ref "AWS::NoValue"
         SubnetIds: !If
           - AddVpc
           - !Ref SubnetIds
           - !Ref "AWS::NoValue"
 
-  LambdaSecurityGroup:
+  LambdaExecutionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: AddVpc
     Properties:
       GroupDescription: Enable Lambda access to Neptune
       VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
 
 Parameters:
   FunctionName:
     Type: String
-    Description: Name for the Lambda function
+    Description: The name of the Lambda function.
   VpcId:
     Type: String
-    Description: VPC ID for the Lambda function
+    Description: The VPC ID where the Lambda function should be deployed.
   SubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: Subnet IDs for the Lambda function
+    Type: CommaDelimitedList
+    Description: The subnet IDs where the Lambda function should be deployed.
   NeptuneEndpoint:
     Type: String
-    Description: Neptune Cluster endpoint
+    Description: The endpoint of the Neptune cluster.
   AddVpc:
     Type: String
     AllowedValues:
       - "true"
       - "false"
-    Description: Whether to add VPC configuration to the Lambda function
+    Description: Whether to add VPC configuration to the Lambda function.
+  CodeBucket:
+    Type: String
+    Description: The S3 bucket where the Lambda function code is stored.
+  CodeKey:
+    Type: String
+    Description: The S3 key for the Lambda function code.
 
 Conditions:
   AddVpc: !Equals [!Ref AddVpc, "true"]

@@ -7,7 +7,7 @@ set -e
 function error_exit {
     echo "$1" 1>&2
     # Remove the zip file if it exists
-    # [ -f "$ZIP_FILE" ] && rm -f "$ZIP_FILE"
+    [ -f "$ZIP_FILE" ] && rm -f "$ZIP_FILE"
     exit 1
 }
 
@@ -45,24 +45,30 @@ NEPTUNE_ENDPOINT=$(aws neptune describe-db-clusters --db-cluster-identifier $NEP
 echo "Retrieved Neptune Endpoint: $NEPTUNE_ENDPOINT"
 
 # Step 3: Zip the Lambda function code
-# ZIP_FILE="$LAMBDA_FUNCTION_NAME.zip"
-# cd $LAMBDA_FUNCTION_NAME || error_exit "Failed to navigate to the Lambda function directory"
-# zip -r ../$ZIP_FILE . || error_exit "Failed to zip the Lambda function code"
-# cd ..
+ZIP_FILE="$LAMBDA_FUNCTION_NAME.zip"
+cd $LAMBDA_FUNCTION_NAME/src || error_exit "Failed to navigate to the Lambda function directory"
+zip -r ../../$ZIP_FILE . || error_exit "Failed to zip the Lambda function code"
+cd ../..
 
 echo "Zipped Lambda function code: $ZIP_FILE"
 
-# Step 4: Deploy the CloudFormation stack using SAM
+# Step 4: Upload the zip file to S3
+S3_BUCKET="aws-sam-cli-managed-default-samclisourcebucket-wsvnc3lqfl9i"
+aws s3 cp $ZIP_FILE s3://$S3_BUCKET/ || error_exit "Failed to upload zip file to S3"
+S3_KEY="$LAMBDA_FUNCTION_NAME.zip"
+
+echo "Uploaded Lambda function code to S3: s3://$S3_BUCKET/$S3_KEY"
+
+# Step 5: Deploy the CloudFormation stack
 STACK_NAME="${LAMBDA_FUNCTION_NAME}-stack"
 
-sam deploy \
+aws cloudformation deploy \
     --stack-name $STACK_NAME \
     --template-file template.yaml \
-    --parameter-overrides FunctionName=$LAMBDA_FUNCTION_NAME VpcId=$VPC_ID SubnetIds=${SUBNET_ID_ARRAY[0]},${SUBNET_ID_ARRAY[1]} NeptuneEndpoint=$NEPTUNE_ENDPOINT AddVpc=$ADD_VPC \
-    --s3-bucket aws-sam-cli-managed-default-samclisourcebucket-wsvnc3lqfl9i \
+    --parameter-overrides FunctionName=$LAMBDA_FUNCTION_NAME VpcId=$VPC_ID SubnetIds=${SUBNET_ID_ARRAY[0]},${SUBNET_ID_ARRAY[1]} NeptuneEndpoint=$NEPTUNE_ENDPOINT AddVpc=$ADD_VPC CodeBucket=$S3_BUCKET CodeKey=$S3_KEY \
     --capabilities CAPABILITY_NAMED_IAM \
     --no-fail-on-empty-changeset || error_exit "Failed to deploy CloudFormation stack"
 
 # Clean up the zip file after successful deployment
-# rm -f "$ZIP_FILE"
+rm -f "$ZIP_FILE"
 echo "CloudFormation stack creation initiated for Lambda function and other resources"
