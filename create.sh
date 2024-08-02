@@ -12,16 +12,20 @@ function error_exit {
 }
 
 # Check if the required arguments are provided
-if [ "$#" -ne 3 ]; then
-    error_exit "Usage: $0 <lambda-function-name> <add-vpc> <neptune-db-cluster>"
+if [ "$#" -ne 2 ] && [ "$#" -ne 3 ]; then
+    error_exit "Usage: $0 <lambda-function-name> <add-vpc> [<neptune-db-cluster>]"
 fi
 
 LAMBDA_FUNCTION_NAME=$1
 ADD_VPC=$2
-NEPTUNE_DB_CLUSTER=$3
 
-# Step 1: Retrieve the VPC ID and Subnet IDs from the Neptune cluster if ADD_VPC is true
 if [ "$ADD_VPC" == "true" ]; then
+    if [ -z "$3" ]; then
+        error_exit "Neptune DB cluster must be provided if ADD_VPC is true"
+    fi
+    NEPTUNE_DB_CLUSTER=$3
+
+    # Step 1: Retrieve the VPC ID and Subnet IDs from the Neptune cluster if ADD_VPC is true
     NEPTUNE_CLUSTER_INFO=$(aws neptune describe-db-clusters --db-cluster-identifier $NEPTUNE_DB_CLUSTER) || error_exit "Failed to retrieve Neptune cluster info"
     INSTANCE_ID=$(echo $NEPTUNE_CLUSTER_INFO | perl -nle 'print $& if m{"DBInstanceIdentifier": "\K[^"]+}' | head -n 1) || error_exit "Failed to extract DBInstanceIdentifier"
     VPC_ID=$(aws neptune describe-db-instances --db-instance-identifier $INSTANCE_ID | perl -nle 'print $& if m{"VpcId": "\K[^"]+}') || error_exit "Failed to retrieve VPC ID"
@@ -34,15 +38,16 @@ if [ "$ADD_VPC" == "true" ]; then
 
     echo "Retrieved VPC ID: $VPC_ID"
     echo "Retrieved Subnet IDs: ${SUBNET_ID_ARRAY[@]}"
+
+    # Step 2: Retrieve the Neptune cluster endpoint
+    NEPTUNE_ENDPOINT=$(aws neptune describe-db-clusters --db-cluster-identifier $NEPTUNE_DB_CLUSTER --query "DBClusters[0].Endpoint" --output text) || error_exit "Failed to retrieve Neptune endpoint"
+
+    echo "Retrieved Neptune Endpoint: $NEPTUNE_ENDPOINT"
 else
     VPC_ID="dummy-vpc-id"
     SUBNET_ID_ARRAY=("dummy-subnet-id1" "dummy-subnet-id2")
+    NEPTUNE_ENDPOINT="dummy-endpoint"
 fi
-
-# Step 2: Retrieve the Neptune cluster endpoint
-NEPTUNE_ENDPOINT=$(aws neptune describe-db-clusters --db-cluster-identifier $NEPTUNE_DB_CLUSTER --query "DBClusters[0].Endpoint" --output text) || error_exit "Failed to retrieve Neptune endpoint"
-
-echo "Retrieved Neptune Endpoint: $NEPTUNE_ENDPOINT"
 
 # Step 3: Zip the Lambda function code
 ZIP_FILE="$LAMBDA_FUNCTION_NAME.zip"

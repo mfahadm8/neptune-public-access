@@ -2,8 +2,9 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: An AWS CloudFormation template describing your function.
 
 Resources:
-  LambdaExecutionRole:
+  LambdaExecutionRoleWithVpc:
     Type: AWS::IAM::Role
+    Condition: AddVpc
     Properties: 
       AssumeRolePolicyDocument: 
         Version: "2012-10-17"
@@ -15,7 +16,7 @@ Resources:
             Action: 
               - "sts:AssumeRole"
       Policies: 
-        - PolicyName: "LambdaPolicy"
+        - PolicyName: "LambdaPolicyWithVpc"
           PolicyDocument: 
             Version: "2012-10-17"
             Statement: 
@@ -62,10 +63,7 @@ Resources:
                   - "xray:GetTraceSummaries"
                   - "xray:BatchGetTraces"
                   - "iam:PassRole"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
                   - "logs:FilterLogEvents"
-                  - "logs:CreateLogGroup"
                 Resource: "*"
               - Effect: "Allow"
                 Action: 
@@ -85,7 +83,82 @@ Resources:
                   - "logs:PutLogEvents"
                 Resource: 
                   - "arn:aws:logs:ap-southeast-2:337393854581:log-group:*"
-  
+
+  LambdaExecutionRoleWithoutVpc:
+    Type: AWS::IAM::Role
+    Condition: NoVpc
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - PolicyName: "LambdaPolicyWithoutVpc"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "kms:ListAliases"
+                  - "kms:ListKeyPolicies"
+                  - "kms:ListKeys"
+                  - "kms:ListRetirableGrants"
+                  - "logs:DescribeLogStreams"
+                  - "logs:GetLogEvents"
+                  - "sns:ListSubscriptions"
+                  - "sns:ListTopics"
+                  - "sns:Publish"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:ListStackResources"
+                  - "cloudwatch:ListMetrics"
+                  - "cloudwatch:GetMetricData"
+                  - "ec2:DescribeSecurityGroups"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeVpcs"
+                  - "iam:GetPolicy"
+                  - "iam:GetPolicyVersion"
+                  - "iam:GetRole"
+                  - "iam:GetRolePolicy"
+                  - "iam:ListAttachedRolePolicies"
+                  - "iam:ListRolePolicies"
+                  - "iam:ListRoles"
+                  - "lambda:*"
+                  - "logs:DescribeLogGroups"
+                  - "states:DescribeStateMachine"
+                  - "states:ListStateMachines"
+                  - "tag:GetResources"
+                  - "xray:GetTraceSummaries"
+                  - "xray:BatchGetTraces"
+                  - "iam:PassRole"
+                  - "logs:FilterLogEvents"
+                Resource: "*"
+              - Effect: "Allow"
+                Action: 
+                  - "iam:PassRole"
+                Resource: "*"
+                Condition: 
+                  StringEquals: 
+                    iam:PassedToService: 
+                      - "lambda.amazonaws.com"
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                Resource: "arn:aws:logs:ap-southeast-2:337393854581:*"
+              - Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: 
+                  - "arn:aws:logs:ap-southeast-2:337393854581:log-group:*"
+
   LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -98,19 +171,24 @@ Resources:
       FunctionName: !Ref FunctionName
       Handler: index.handler
       Runtime: nodejs20.x
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: 
+        !If
+          - AddVpc
+          - !GetAtt LambdaExecutionRoleWithVpc.Arn
+          - !GetAtt LambdaExecutionRoleWithoutVpc.Arn
       Environment:
-        Variables:
-          NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
+        Variables: 
+          !If 
+            - AddVpc
+            - NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
+            - Ref: "AWS::NoValue"
       VpcConfig: 
-        SecurityGroupIds: !If
+        !If 
           - AddVpc
-          - [!Ref LambdaExecutionSecurityGroup]
-          - !Ref "AWS::NoValue"
-        SubnetIds: !If
-          - AddVpc
-          - !Ref SubnetIds
-          - !Ref "AWS::NoValue"
+          - SecurityGroupIds: 
+              - !Ref LambdaExecutionSecurityGroup
+            SubnetIds: !Ref SubnetIds
+          - Ref: "AWS::NoValue"
 
   LambdaExecutionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -134,16 +212,15 @@ Resources:
 Parameters:
   FunctionName:
     Type: String
-    Description: The name of the Lambda function.
   VpcId:
     Type: String
-    Description: The VPC ID where the Lambda function should be deployed.
+    Default: dummy-vpc-id
   SubnetIds:
     Type: CommaDelimitedList
-    Description: The subnet IDs where the Lambda function should be deployed.
+    Default: dummy-subnet-id1,dummy-subnet-id2
   NeptuneEndpoint:
     Type: String
-    Description: The endpoint of the Neptune cluster.
+    Default: ""
   AddVpc:
     Type: String
     AllowedValues:
@@ -152,10 +229,13 @@ Parameters:
     Description: Whether to add VPC configuration to the Lambda function.
   CodeBucket:
     Type: String
-    Description: The S3 bucket where the Lambda function code is stored.
   CodeKey:
     Type: String
-    Description: The S3 key for the Lambda function code.
 
 Conditions:
   AddVpc: !Equals [!Ref AddVpc, "true"]
+  NoVpc: !Not [!Condition AddVpc]
+
+Outputs:
+  LambdaFunctionName:
+    Value: !Ref LambdaFunction
